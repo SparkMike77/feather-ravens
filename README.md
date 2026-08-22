@@ -57,9 +57,14 @@ One `POST <ingest_url>` per matched story, JSON body:
   "summary": "...",
   "full_text": "...",
   "matched_interest": "climate",
+  "published_at": "2026-08-22T09:15:00Z",
   "fetched_at": "2026-08-22T12:00:00Z"
 }
 ```
+
+`published_at` is the article's own publish date (per the feed, zero value if it didn't provide
+one) - the freshness signal for whatever facts get derived from this candidate later. Distinct from
+`fetched_at`, which is just when this Raven happened to grab it.
 
 Any non-2xx response is logged and skipped — a Raven never crashes or retries indefinitely over a
 single delivery failure.

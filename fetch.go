@@ -1,13 +1,18 @@
 package main
 
-import "github.com/mmcdole/gofeed"
+import (
+	"time"
 
-// Story is one headline/summary/link triple pulled from a feed - the raw shortlist, before any
-// interest filtering happens.
+	"github.com/mmcdole/gofeed"
+)
+
+// Story is one headline/summary/link/publish-date quadruple pulled from a feed - the raw
+// shortlist, before any interest filtering happens.
 type Story struct {
-	Title   string
-	Summary string
-	Link    string
+	Title     string
+	Summary   string
+	Link      string
+	Published time.Time // zero value if the feed didn't provide a parseable date
 }
 
 // fetchStories pulls and parses the configured feed. gofeed is used rather than hand-rolling XML
@@ -24,10 +29,15 @@ func fetchStories(feedURL string) ([]Story, error) {
 
 	stories := make([]Story, 0, len(feed.Items))
 	for _, item := range feed.Items {
+		var published time.Time
+		if item.PublishedParsed != nil {
+			published = *item.PublishedParsed
+		}
 		stories = append(stories, Story{
-			Title:   item.Title,
-			Summary: item.Description,
-			Link:    item.Link,
+			Title:     item.Title,
+			Summary:   item.Description,
+			Link:      item.Link,
+			Published: published,
 		})
 	}
 	return stories, nil

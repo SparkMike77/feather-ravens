@@ -62,6 +62,7 @@ func runOnce(cfg *Config) {
 			Summary:         story.Summary,
 			FullText:        fullText,
 			MatchedInterest: keyword,
+			PublishedAt:     story.Published,
 			FetchedAt:       time.Now().UTC(),
 		}
 

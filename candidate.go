@@ -14,5 +14,6 @@ type Candidate struct {
 	Summary         string    `json:"summary"`          // original feed summary, kept for context
 	FullText        string    `json:"full_text"`        // readability-extracted article body
 	MatchedInterest string    `json:"matched_interest"` // which configured keyword triggered this
-	FetchedAt       time.Time `json:"fetched_at"`
+	PublishedAt     time.Time `json:"published_at"`     // the article's own publish date (freshness) - zero value if the feed had none
+	FetchedAt       time.Time `json:"fetched_at"`       // when this Raven fetched it, distinct from when the article was published
 }
