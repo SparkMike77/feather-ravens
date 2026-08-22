@@ -1,0 +1,19 @@
+[Unit]
+Description=Feather Raven (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/raven -config /etc/feather-ravens/%i.toml
+Restart=on-failure
+RestartSec=10
+# Ephemeral, unprivileged per-service user - a Raven only needs outbound HTTP, nothing else.
+DynamicUser=yes
+
+[Install]
+WantedBy=multi-user.target
+
+# Install: cp raven /usr/local/bin/, put per-source configs at /etc/feather-ravens/<name>.toml,
+# then: systemctl enable --now raven@<name>.service   (e.g. raven@bbc-world.service reads
+# /etc/feather-ravens/bbc-world.toml)

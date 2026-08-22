@@ -1,0 +1,7 @@
+# Compiled binary
+/raven
+/raven.exe
+
+# Real per-source configs - only the example is committed
+*.toml
+!raven.example.toml

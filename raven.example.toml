@@ -1,0 +1,11 @@
+# Copy this file to raven.toml (gitignored) and adjust for your source.
+# One Raven = one config = one process. Run multiple instances for multiple sources -
+# see systemd/raven@.service.
+
+name = "BBC World News"
+feed_url = "http://feeds.bbci.co.uk/news/world/rss.xml"
+check_interval = "30m"          # Go duration string: "30m", "1h", "90s", etc.
+interests = ["climate", "elections", "central bank"]
+
+# Where extracted facts get posted. Not built yet on the Feather side - placeholder for now.
+ingest_url = "http://localhost:8765/proactive/ingest/news"
