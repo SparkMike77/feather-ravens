@@ -45,6 +45,8 @@ ingest_url = "http://localhost:8765/proactive/ingest/news"
 
 See `systemd/raven@.service` for running multiple sources as systemd units.
 
+See [FUNCTIONS.md](FUNCTIONS.md) for a Mermaid diagram of every function's inputs/outputs.
+
 ## What gets posted
 
 One `POST <ingest_url>` per matched story, JSON body:
