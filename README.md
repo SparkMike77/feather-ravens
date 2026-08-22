@@ -1,15 +1,19 @@
 # feather-ravens
 
 Small standalone Go daemons ("Ravens") that each poll one news source on a schedule, pull headline
-summaries, and flag stories matching configured interests. One binary, one config file per source,
-no shared state between instances.
+summaries, and — for stories matching configured interests — fetch the full article text and post
+it onward as a JSON "candidate". One binary, one config file per source, no shared state between
+instances.
 
 Built as a data-collection front end for a personal AI assistant's proactive-monitoring layer, but
-has no hard dependency on one — it just posts JSON to a configurable HTTP endpoint.
+has no hard dependency on one — it just posts JSON to a configurable HTTP endpoint. Deliberately
+stays deterministic throughout (feed fetch, keyword match, readability-style article extraction) —
+turning a candidate's raw text into structured facts is an LLM-assisted step that belongs on the
+receiving end, not here.
 
-**Status: early scaffold.** Feed fetching and keyword matching work end to end. Full-article fetch,
-LLM-based fact extraction, and the receiving HTTP endpoint don't exist yet (see `extract.go` /
-`ingest.go`).
+**Status:** feed fetching, keyword matching, full-article extraction, and posting candidates all
+work end to end (verified against a live feed). The receiving endpoint this posts to doesn't exist
+yet on the Feather side.
 
 ## Build
 
@@ -40,6 +44,25 @@ ingest_url = "http://localhost:8765/proactive/ingest/news"
 ```
 
 See `systemd/raven@.service` for running multiple sources as systemd units.
+
+## What gets posted
+
+One `POST <ingest_url>` per matched story, JSON body:
+
+```json
+{
+  "source": "BBC World News",
+  "article_url": "https://...",
+  "title": "...",
+  "summary": "...",
+  "full_text": "...",
+  "matched_interest": "climate",
+  "fetched_at": "2026-08-22T12:00:00Z"
+}
+```
+
+Any non-2xx response is logged and skipped — a Raven never crashes or retries indefinitely over a
+single delivery failure.
 
 ## License
 

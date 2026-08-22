@@ -16,6 +16,7 @@ type Story struct {
 // robustly - not worth re-solving here.
 func fetchStories(feedURL string) ([]Story, error) {
 	parser := gofeed.NewParser()
+	parser.UserAgent = userAgent
 	feed, err := parser.ParseURL(feedURL)
 	if err != nil {
 		return nil, err
