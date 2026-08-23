@@ -234,9 +234,10 @@
 
       <h3>Topic and Target — the two things a Raven needs</h3>
       <p><strong>Topic</strong> is the word or phrase it's listening for — "AI", "climate", "central
-      bank." <strong>Target</strong> is the source it's watching — a name (like "BBC News") and the
+      bank" (comma-separate a few if you want more than one, e.g. "AI, climate").
+      <strong>Target</strong> is the source it's watching — a name (like "BBC News") and the
       actual feed address (a URL ending in something like <code>/rss</code> or <code>/feed</code>).
-      A Raven only cares about stories where its Target published something matching its Topic.</p>
+      A Raven only cares about stories where its Target published something matching one of its Topics.</p>
 
       <h3>What happens when it finds a match</h3>
       <div class="pipeline">
@@ -284,8 +285,8 @@
 
       <div class="grid">
         <div class="field full">
-          <label>Topic <span class="opt">— what to watch for</span></label>
-          <input type="text" id="f-topic" placeholder="AI" value="AI">
+          <label>Topic <span class="opt">— what to watch for, comma-separated for more than one</span></label>
+          <input type="text" id="f-topic" placeholder="AI, climate" value="AI">
         </div>
 
         <div class="field">
@@ -406,6 +407,16 @@
     return String(s || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   }
 
+  // Single-quoted shell literal, safe against spaces/$/backticks/etc. - the standard POSIX-safe
+  // quoting trick (close the quote, escape a literal ', reopen it).
+  function shellEscape(s) {
+    return `'${String(s || '').replace(/'/g, `'\\''`)}'`;
+  }
+
+  function parseTopics(topic) {
+    return String(topic || '').split(',').map((t) => t.trim()).filter(Boolean);
+  }
+
   const INTERVAL_RE = /^([0-9]+(ns|us|µs|ms|s|m|h))+$/;
   const URL_RE = /^https?:\/\/.+/i;
 
@@ -436,34 +447,32 @@
       ? 'Must start with http:// or https://'
       : 'Doesn’t look like a URL — must start with http:// or https://';
 
+    const interestsToml = parseTopics(topic).map((t) => `"${tomlEscape(t)}"`).join(', ');
     const toml =
 `name = "${tomlEscape(name)}"
 feed_url = "${tomlEscape(feed || 'https://example.com/rss')}"
 check_interval = "${tomlEscape(interval)}"
-interests = ["${tomlEscape(topic)}"]
+interests = [${interestsToml}]
 ingest_url = "${tomlEscape(ingest)}"
 `;
     $('out-toml').textContent = toml;
 
+    // This is a preview only - the actual file gets written by setup-raven.sh itself (below),
+    // not by this page. One script does the real work everywhere (this page, an interactive
+    // terminal, and Feather's own stage_raven_config tool all call the same setup-raven.sh)
+    // rather than three copies of the same install logic quietly drifting apart.
     const cmds =
-`sudo mkdir -p /etc/feather-ravens
-sudo tee /etc/feather-ravens/${slug}.toml > /dev/null <<'EOF'
-${toml}EOF
-
-# Get the source if it isn't already on the box, otherwise just update it
+`# Get the source if it isn't already on the box, otherwise just update it
 [ -d /opt/feather-ravens-src ] \\
   && (cd /opt/feather-ravens-src && sudo git pull) \\
   || sudo git clone https://github.com/SparkMike77/feather-ravens.git /opt/feather-ravens-src
 
-# -buildvcs=false avoids a "dubious ownership" build error when building as root
-cd /opt/feather-ravens-src && sudo go build -buildvcs=false -o /usr/local/bin/raven .
-
-sudo cp /opt/feather-ravens-src/systemd/raven@.service /etc/systemd/system/raven@.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now raven@${slug}.service
-
-# Verify:
-systemctl status raven@${slug} --no-pager`;
+sudo /opt/feather-ravens-src/scripts/setup-raven.sh \\
+  --topic ${shellEscape(topic)} \\
+  --name ${shellEscape(name)} \\
+  --feed-url ${shellEscape(feed || 'https://example.com/rss')} \\
+  --interval ${shellEscape(interval)} \\
+  --ingest-url ${shellEscape(ingest)}`;
     $('out-cmds').textContent = cmds;
 
     $('slug-echo').textContent = slug;
