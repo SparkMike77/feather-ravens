@@ -12,8 +12,7 @@ turning a candidate's raw text into structured facts is an LLM-assisted step tha
 receiving end, not here.
 
 **Status:** feed fetching, keyword matching, full-article extraction, and posting candidates all
-work end to end (verified against a live feed). The receiving endpoint this posts to doesn't exist
-yet on the Feather side.
+work end to end (verified against a live feed and a live Feather ingest endpoint).
 
 ## Build
 
@@ -43,7 +42,9 @@ interests = ["climate", "elections", "central bank"]
 ingest_url = "http://localhost:8765/proactive/ingest/news"
 ```
 
-See `systemd/raven@.service` for running multiple sources as systemd units.
+See `systemd/raven@.service` for running multiple sources as systemd units, or run
+`sudo scripts/setup-raven.sh` for an interactive installer that asks for a topic and a target feed
+and takes care of the build, config, unit install, and `systemctl enable --now` in one pass.
 
 See [FUNCTIONS.md](FUNCTIONS.md) for a Mermaid diagram of every function's inputs/outputs.
 
