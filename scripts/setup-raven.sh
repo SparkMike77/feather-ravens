@@ -51,7 +51,9 @@ echo "Wrote $config_path"
 
 echo "Building raven binary from $REPO_DIR..."
 tmp_bin="$(mktemp)"
-( cd "$REPO_DIR" && go build -o "$tmp_bin" . )
+# -buildvcs=false: this runs under sudo, so the repo (owned by a regular user) looks like
+# "dubious ownership" to git - Go's VCS stamping then fails the build entirely.
+( cd "$REPO_DIR" && go build -buildvcs=false -o "$tmp_bin" . )
 install -m 755 "$tmp_bin" "$BIN_PATH"
 rm -f "$tmp_bin"
 echo "Installed $BIN_PATH"

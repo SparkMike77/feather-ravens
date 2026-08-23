@@ -46,6 +46,11 @@ See `systemd/raven@.service` for running multiple sources as systemd units, or r
 `sudo scripts/setup-raven.sh` for an interactive installer that asks for a topic and a target feed
 and takes care of the build, config, unit install, and `systemctl enable --now` in one pass.
 
+For anyone who'd rather not run an unfamiliar script blind, [web/index.html](web/index.html) is a
+static, no-backend page that builds the same `raven.toml` and install commands interactively and
+explains how the whole thing works in plain language - see [web/README.md](web/README.md). It's
+display-only: it generates text for you to run yourself over SSH, never touches the server.
+
 See [FUNCTIONS.md](FUNCTIONS.md) for a Mermaid diagram of every function's inputs/outputs.
 
 ## What gets posted

@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feather Ravens — Command Builder</title>
+<meta name="description" content="Display-only companion for feather-ravens: build the exact commands to stand up, check on, or remove a Raven. All real control happens over SSH.">
+<style>
+  :root {
+    --bg: #0c1016;
+    --bg-alt: #10151d;
+    --surface: #151b25;
+    --surface-2: #1b2330;
+    --border: #29334280;
+    --border-strong: #3a465a;
+    --text: #dfe6ef;
+    --text-dim: #8d99ad;
+    --text-faint: #5c6579;
+    --accent: #6fd6d6;       /* glacier ice */
+    --accent-strong: #9fe8e8;
+    --accent-bronze: #c99a5b; /* rune-gold */
+    --danger: #e08a8a;
+    --ok: #7cd68a;
+    --radius: 14px;
+    --mono: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, Menlo, monospace;
+    --sans: -apple-system, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #eef1f5;
+      --bg-alt: #e4e9ef;
+      --surface: #ffffff;
+      --surface-2: #f4f6f9;
+      --border: #d2d9e2;
+      --border-strong: #b7c1cf;
+      --text: #1b2330;
+      --text-dim: #4d5a6d;
+      --text-faint: #7c8797;
+      --accent: #1a8f8f;
+      --accent-strong: #0f6f6f;
+      --accent-bronze: #9a6b28;
+      --danger: #b33a3a;
+      --ok: #2c8a3f;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background:
+      radial-gradient(1200px 600px at 15% -10%, #1a2230 0%, transparent 60%),
+      radial-gradient(900px 500px at 110% 10%, #16202a 0%, transparent 55%),
+      var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    line-height: 1.55;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .wrap { max-width: 880px; margin: 0 auto; padding: 40px 20px 80px; }
+
+  /* ---------- header ---------- */
+  header.top {
+    display: flex; align-items: center; gap: 14px;
+    padding-bottom: 22px; margin-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+  }
+  .raven-mark { width: 40px; height: 40px; flex: none; color: var(--accent); }
+  .raven-mark svg { width: 100%; height: 100%; display: block; }
+  header.top h1 {
+    font-size: 1.35rem; margin: 0; letter-spacing: 0.02em; font-weight: 650;
+  }
+  header.top .sub { color: var(--text-dim); font-size: 0.88rem; margin-top: 2px; }
+  .rune-rule {
+    text-align: center; color: var(--text-faint); letter-spacing: 0.5em;
+    font-size: 0.85rem; margin: 34px 0; user-select: none; opacity: 0.6;
+  }
+
+  .badge-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 0; }
+  .badge {
+    font-size: 0.72rem; padding: 3px 9px; border-radius: 999px;
+    border: 1px solid var(--border-strong); color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .badge.display { color: var(--accent-strong); border-color: color-mix(in srgb, var(--accent) 50%, var(--border-strong)); }
+  .badge.ssh { color: var(--accent-bronze); border-color: color-mix(in srgb, var(--accent-bronze) 50%, var(--border-strong)); }
+
+  /* ---------- cards ---------- */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 22px;
+    overflow: hidden;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.15);
+  }
+  .card > .card-body { padding: 22px 24px; }
+  .card h2 {
+    font-size: 1.02rem; margin: 0 0 4px; font-weight: 620;
+    display: flex; align-items: center; gap: 9px;
+  }
+  .card h2 .icon { color: var(--accent); flex: none; width: 18px; height: 18px; }
+  .card .desc { color: var(--text-dim); font-size: 0.88rem; margin: 4px 0 18px; }
+
+  /* collapsible */
+  details.card { padding: 0; }
+  details.card > summary {
+    list-style: none; cursor: pointer; padding: 18px 24px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    user-select: none;
+  }
+  details.card > summary::-webkit-details-marker { display: none; }
+  details.card > summary .row { display: flex; align-items: center; gap: 10px; }
+  details.card > summary h2 { margin: 0; }
+  .chev { width: 16px; height: 16px; color: var(--text-faint); transition: transform 0.18s ease; flex: none; }
+  details[open] > summary .chev { transform: rotate(90deg); }
+  details.card > .card-body { border-top: 1px solid var(--border); padding-top: 20px; }
+  summary .desc-inline { color: var(--text-dim); font-size: 0.82rem; font-weight: 400; margin-left: 2px; }
+
+  /* ---------- ELI5 content ---------- */
+  .eli5 h3 {
+    font-size: 0.9rem; color: var(--accent-strong); margin: 20px 0 6px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .eli5 h3:first-child { margin-top: 0; }
+  .eli5 p { margin: 0 0 10px; color: var(--text); font-size: 0.92rem; }
+  .eli5 p.dim { color: var(--text-dim); font-size: 0.85rem; }
+  .eli5 .pipeline {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    margin: 10px 0 16px; font-size: 0.82rem;
+  }
+  .pipeline .step {
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 10px; color: var(--text);
+  }
+  .pipeline .arrow { color: var(--text-faint); }
+
+  /* ---------- form ---------- */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field.full { grid-column: 1 / -1; }
+  label { font-size: 0.78rem; color: var(--text-dim); font-weight: 600; letter-spacing: 0.02em; }
+  label .opt { font-weight: 400; color: var(--text-faint); text-transform: none; }
+  input[type=text], input[type=url], select {
+    background: var(--bg-alt); border: 1px solid var(--border-strong);
+    color: var(--text); padding: 9px 11px; border-radius: 9px;
+    font-family: var(--mono); font-size: 0.86rem; width: 100%;
+    outline: none; transition: border-color 0.15s ease;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+  input.invalid { border-color: var(--danger); }
+  .hint { font-size: 0.74rem; color: var(--text-faint); }
+  .hint.warn { color: var(--danger); }
+  .presets { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+  .preset-btn {
+    background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--text-dim); font-size: 0.74rem; padding: 4px 9px;
+    border-radius: 999px; cursor: pointer; font-family: var(--mono);
+  }
+  .preset-btn:hover { border-color: var(--accent); color: var(--accent-strong); }
+
+  /* ---------- output blocks ---------- */
+  .output { margin-top: 22px; }
+  .output-label {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .output-label span { font-size: 0.78rem; color: var(--text-dim); font-weight: 600; }
+  pre.codeblock {
+    background: #080b10; border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; overflow-x: auto; font-family: var(--mono);
+    font-size: 0.8rem; line-height: 1.6; color: #cfe8e8; margin: 0;
+  }
+  .copy-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--surface-2); border: 1px solid var(--border-strong);
+    color: var(--text); font-size: 0.74rem; padding: 5px 10px;
+    border-radius: 7px; cursor: pointer; font-family: var(--sans);
+  }
+  .copy-btn:hover { border-color: var(--accent); }
+  .copy-btn svg { width: 13px; height: 13px; }
+  .copy-btn.copied { color: var(--ok); border-color: var(--ok); }
+
+  /* ---------- monitoring section ---------- */
+  .mgmt-grid { display: grid; gap: 14px; }
+  .mgmt-item .mgmt-title {
+    font-size: 0.82rem; font-weight: 650; margin-bottom: 4px; color: var(--text);
+  }
+  .mgmt-item .mgmt-note { font-size: 0.78rem; color: var(--text-dim); margin-bottom: 6px; }
+
+  footer {
+    text-align: center; color: var(--text-faint); font-size: 0.78rem; margin-top: 40px;
+  }
+  footer a { color: var(--text-dim); }
+
+  ::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="raven-mark">
+      <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 40c4-14 14-24 24-24 3 0 5 1 5 1s-2-6-8-8c8-2 16 2 20 10 2 4 2 8 1 11 3 1 6 3 6 3s-4 2-8 1c1 3 0 6-2 8-3-2-5-3-5-3s0 4-3 7c-2-3-3-6-3-6s-9 6-19 6c-5 0-9-2-9-2s3-2 1-4z"
+              fill="currentColor" opacity="0.92"/>
+        <circle cx="41" cy="19" r="1.6" fill="#0c1016"/>
+      </svg>
+    </div>
+    <div>
+      <h1>Feather Ravens</h1>
+      <div class="sub">Huginn and Muninn, thought and memory — sent out to watch the world and report back.</div>
+      <div class="badge-row">
+        <span class="badge display">This page: display &amp; command generation only</span>
+        <span class="badge ssh">All real control: SSH on the server</span>
+      </div>
+    </div>
+  </header>
+
+  <details class="card" id="eli5">
+    <summary>
+      <div class="row">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5M12 8h.01"/></svg>
+        <h2>How this works <span class="desc-inline">— plain-language explainer</span></h2>
+      </div>
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+    </summary>
+    <div class="card-body eli5">
+
+      <h3>What is a Raven?</h3>
+      <p>A small program that watches <em>one</em> news source — like a website's RSS feed — on a
+      timer. It never sleeps: it wakes up every so often (say, every 30 minutes), checks for new
+      stories, and goes back to waiting. One Raven only ever watches one source. If you want to
+      watch five sources, you run five Ravens.</p>
+
+      <h3>Topic and Target — the two things a Raven needs</h3>
+      <p><strong>Topic</strong> is the word or phrase it's listening for — "AI", "climate", "central
+      bank." <strong>Target</strong> is the source it's watching — a name (like "BBC News") and the
+      actual feed address (a URL ending in something like <code>/rss</code> or <code>/feed</code>).
+      A Raven only cares about stories where its Target published something matching its Topic.</p>
+
+      <h3>What happens when it finds a match</h3>
+      <div class="pipeline">
+        <span class="step">Raven checks the feed</span><span class="arrow">→</span>
+        <span class="step">headline matches Topic?</span><span class="arrow">→</span>
+        <span class="step">fetches the full article</span><span class="arrow">→</span>
+        <span class="step">sends it to Feather</span><span class="arrow">→</span>
+        <span class="step">Feather reviews &amp; stores it</span>
+      </div>
+      <p class="dim">The Raven itself does no thinking — it's a dumb, reliable fetch-and-match
+      loop on purpose. Feather's own analyzer is what actually reads the article afterward (with
+      safeguards, since scraped web pages are not trustworthy input — more on that below).</p>
+
+      <h3>How it keeps running</h3>
+      <p>Each Raven is installed as a <strong>systemd service</strong> — a standard piece of Linux
+      that starts programs automatically when the server boots, and restarts them if they ever
+      crash. You never have to remember to start a Raven by hand; once it's installed and enabled,
+      it just runs, forever, quietly, in the background.</p>
+
+      <h3>A note on safety</h3>
+      <p>Article text pulled in by a Raven is treated as <em>untrusted</em> the moment it lands on
+      Feather's side — a scraped web page can contain text deliberately written to trick an AI
+      reading it (a real example showed up in testing: a "news" page that tried to instruct an AI
+      to install a data-exfiltrating browser connector). Feather's analyzer screens for that before
+      any of it reaches a model. This page and the Raven itself don't run any AI at all, so there's
+      nothing here for that kind of trick to target.</p>
+
+    </div>
+  </details>
+
+  <div class="rune-rule">ᚱᚨᚡᛖᚾ</div>
+
+  <div class="card" id="builder">
+    <div class="card-body">
+      <h2>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 17l6-6-6-6M12 19h8"/></svg>
+        Command builder
+      </h2>
+      <p class="desc">Fill this in, then copy the generated commands into an SSH session on the
+      server yourself. Nothing on this page can reach the server — it only builds text.</p>
+
+      <div class="grid">
+        <div class="field full">
+          <label>Topic <span class="opt">— what to watch for</span></label>
+          <input type="text" id="f-topic" placeholder="AI" value="AI">
+        </div>
+
+        <div class="field">
+          <label>Target name</label>
+          <input type="text" id="f-name" placeholder="CBC News" value="CBC News">
+        </div>
+        <div class="field">
+          <label>Domain <span class="opt">— groups sources in Feather</span></label>
+          <input type="text" id="f-domain" placeholder="news" value="news">
+        </div>
+
+        <div class="field full">
+          <label>Target feed URL <span class="opt">— RSS/Atom</span></label>
+          <input type="url" id="f-feed" placeholder="https://example.com/rss">
+          <span class="hint" id="feed-hint">Must start with http:// or https://</span>
+        </div>
+
+        <div class="field">
+          <label>Check interval</label>
+          <input type="text" id="f-interval" value="30m">
+          <div class="presets">
+            <button type="button" class="preset-btn" data-val="15m">15m</button>
+            <button type="button" class="preset-btn" data-val="30m">30m</button>
+            <button type="button" class="preset-btn" data-val="1h">1h</button>
+            <button type="button" class="preset-btn" data-val="2h">2h</button>
+            <button type="button" class="preset-btn" data-val="6h">6h</button>
+          </div>
+          <span class="hint" id="interval-hint">Go duration format — a bare number like "30" will fail to start.</span>
+        </div>
+        <div class="field">
+          <label>Ingest URL <span class="opt">— where matches get posted</span></label>
+          <input type="text" id="f-ingest" placeholder="http://localhost:8765/proactive/ingest/news">
+          <span class="hint">Auto-fills from Domain until you edit it yourself.</span>
+        </div>
+      </div>
+
+      <div class="output">
+        <div class="output-label">
+          <span>Generated <code>/etc/feather-ravens/&lt;slug&gt;.toml</code></span>
+          <button class="copy-btn" data-copy-target="out-toml"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>Copy</button>
+        </div>
+        <pre class="codeblock" id="out-toml"></pre>
+      </div>
+
+      <div class="output">
+        <div class="output-label">
+          <span>Commands to run over SSH on the server</span>
+          <button class="copy-btn" data-copy-target="out-cmds"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>Copy</button>
+        </div>
+        <pre class="codeblock" id="out-cmds"></pre>
+      </div>
+    </div>
+  </div>
+
+  <details class="card" id="manage">
+    <summary>
+      <div class="row">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20a8 8 0 100-16 8 8 0 000 16zM12 9v3l2 2"/></svg>
+        <h2>Check on it, or remove it <span class="desc-inline">— also SSH, also just commands</span></h2>
+      </div>
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+    </summary>
+    <div class="card-body">
+      <p class="desc" style="margin-top:-6px">These use the slug from the builder above (currently
+      <code id="slug-echo">cbc-news</code>) — fill in the builder first if you want these scoped to
+      a specific Raven.</p>
+      <div class="mgmt-grid">
+
+        <div class="mgmt-item">
+          <div class="mgmt-title">Is it running?</div>
+          <pre class="codeblock" id="cmd-status"></pre>
+        </div>
+
+        <div class="mgmt-item">
+          <div class="mgmt-title">Watch it live (Ctrl+C to stop watching)</div>
+          <pre class="codeblock" id="cmd-logs"></pre>
+        </div>
+
+        <div class="mgmt-item">
+          <div class="mgmt-title">List every Raven on the box</div>
+          <pre class="codeblock" id="cmd-list"></pre>
+        </div>
+
+        <div class="mgmt-item">
+          <div class="mgmt-title">Remove this Raven</div>
+          <pre class="codeblock" id="cmd-remove"></pre>
+        </div>
+
+      </div>
+    </div>
+  </details>
+
+  <footer>
+    Static, self-contained, no backend — open this file directly or serve it with anything that
+    can host a folder. Source: <a href="https://github.com/SparkMike77/feather-ravens">feather-ravens</a>.
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+
+  const els = {
+    topic: $('f-topic'), name: $('f-name'), domain: $('f-domain'),
+    feed: $('f-feed'), interval: $('f-interval'), ingest: $('f-ingest'),
+  };
+
+  let ingestTouched = false;
+  els.ingest.addEventListener('input', () => { ingestTouched = true; });
+
+  function slugify(name) {
+    const s = (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return s || 'target';
+  }
+
+  function tomlEscape(s) {
+    return String(s || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  }
+
+  const INTERVAL_RE = /^([0-9]+(ns|us|µs|ms|s|m|h))+$/;
+  const URL_RE = /^https?:\/\/.+/i;
+
+  function render() {
+    const topic = els.topic.value.trim() || 'AI';
+    const name = els.name.value.trim() || 'Target Name';
+    const domain = els.domain.value.trim() || 'news';
+    const feed = els.feed.value.trim();
+    const interval = els.interval.value.trim() || '30m';
+    const slug = slugify(name);
+
+    if (!ingestTouched) {
+      els.ingest.value = `http://localhost:8765/proactive/ingest/${domain || 'news'}`;
+    }
+    const ingest = els.ingest.value.trim();
+
+    const intervalOk = INTERVAL_RE.test(interval);
+    els.interval.classList.toggle('invalid', !intervalOk);
+    $('interval-hint').classList.toggle('warn', !intervalOk);
+    $('interval-hint').textContent = intervalOk
+      ? 'Go duration format — a bare number like "30" will fail to start.'
+      : 'Not a valid Go duration — needs a unit, e.g. "30m", "1h", "90s".';
+
+    const feedOk = feed === '' || URL_RE.test(feed);
+    els.feed.classList.toggle('invalid', !feedOk);
+    $('feed-hint').classList.toggle('warn', !feedOk);
+    $('feed-hint').textContent = feedOk
+      ? 'Must start with http:// or https://'
+      : 'Doesn’t look like a URL — must start with http:// or https://';
+
+    const toml =
+`name = "${tomlEscape(name)}"
+feed_url = "${tomlEscape(feed || 'https://example.com/rss')}"
+check_interval = "${tomlEscape(interval)}"
+interests = ["${tomlEscape(topic)}"]
+ingest_url = "${tomlEscape(ingest)}"
+`;
+    $('out-toml').textContent = toml;
+
+    const cmds =
+`sudo mkdir -p /etc/feather-ravens
+sudo tee /etc/feather-ravens/${slug}.toml > /dev/null <<'EOF'
+${toml}EOF
+
+# Get the source if it isn't already on the box, otherwise just update it
+[ -d /opt/feather-ravens-src ] \\
+  && (cd /opt/feather-ravens-src && sudo git pull) \\
+  || sudo git clone https://github.com/SparkMike77/feather-ravens.git /opt/feather-ravens-src
+
+# -buildvcs=false avoids a "dubious ownership" build error when building as root
+cd /opt/feather-ravens-src && sudo go build -buildvcs=false -o /usr/local/bin/raven .
+
+sudo cp /opt/feather-ravens-src/systemd/raven@.service /etc/systemd/system/raven@.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now raven@${slug}.service
+
+# Verify:
+systemctl status raven@${slug} --no-pager`;
+    $('out-cmds').textContent = cmds;
+
+    $('slug-echo').textContent = slug;
+    $('cmd-status').textContent = `systemctl status raven@${slug} --no-pager`;
+    $('cmd-logs').textContent = `sudo journalctl -u raven@${slug} -f`;
+    $('cmd-list').textContent = `systemctl list-units 'raven@*' --all\nls /etc/feather-ravens/`;
+    $('cmd-remove').textContent =
+`sudo systemctl disable --now raven@${slug}.service
+sudo rm /etc/feather-ravens/${slug}.toml
+sudo systemctl daemon-reload`;
+  }
+
+  Object.values(els).forEach((el) => el.addEventListener('input', render));
+  document.querySelectorAll('.preset-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      els.interval.value = btn.getAttribute('data-val');
+      render();
+    });
+  });
+
+  function selectText(node) {
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  document.querySelectorAll('.copy-btn').forEach((btn) => {
+    const original = btn.innerHTML;
+    btn.addEventListener('click', async () => {
+      const target = $(btn.getAttribute('data-copy-target'));
+      try {
+        await navigator.clipboard.writeText(target.textContent);
+        btn.classList.add('copied');
+        btn.innerHTML = original.replace(/Copy$/, 'Copied');
+        setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = original; }, 1400);
+      } catch (e) {
+        // file:// pages or older browsers can refuse clipboard access - fall back to
+        // selecting the block so the user can copy it themselves (Ctrl/Cmd+C).
+        selectText(target);
+      }
+    });
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
