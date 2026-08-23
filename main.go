@@ -26,16 +26,25 @@ func main() {
 
 	log.Printf("raven: watching %q (%s), checking every %s", cfg.Name, cfg.FeedURL, cfg.CheckInterval)
 
+	// Posted article URLs, for this run of the process - most feeds keep republishing the same
+	// still-current story on every poll, and without this a long-lived front-page item gets
+	// posted as a "new" candidate every single check_interval forever. Deliberately in-memory
+	// only, not persisted to disk: a Raven restart re-posting whatever's still on the front page
+	// once is an acceptable, rare cost, not worth the added state-file complexity to avoid (see
+	// README's "no shared state between instances" stance - this keeps that true across
+	// instances, just not across restarts of the same one).
+	seen := make(map[string]struct{})
+
 	ticker := time.NewTicker(cfg.CheckInterval)
 	defer ticker.Stop()
 
-	runOnce(cfg) // check immediately on startup rather than waiting a full interval first
+	runOnce(cfg, seen) // check immediately on startup rather than waiting a full interval first
 	for range ticker.C {
-		runOnce(cfg)
+		runOnce(cfg, seen)
 	}
 }
 
-func runOnce(cfg *Config) {
+func runOnce(cfg *Config, seen map[string]struct{}) {
 	stories, err := fetchStories(cfg.FeedURL)
 	if err != nil {
 		log.Printf("raven: fetch failed: %v", err)
@@ -47,6 +56,15 @@ func runOnce(cfg *Config) {
 		if !ok {
 			continue
 		}
+		if _, alreadyPosted := seen[story.Link]; alreadyPosted {
+			continue
+		}
+		// Marked seen now, before fetch/post even succeeds: a story whose full-text fetch or
+		// ingest POST fails will fail the same way again next poll (a paywall, a dead link) -
+		// retrying it forever would just mean quietly re-attempting the same broken URL on a
+		// loop, not recovering it.
+		seen[story.Link] = struct{}{}
+
 		log.Printf("raven: interesting story (matched %q): %q (%s)", keyword, story.Title, story.Link)
 
 		fullText, err := fetchArticleText(story.Link)
