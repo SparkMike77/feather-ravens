@@ -107,15 +107,25 @@ ingest_url = "$ingest_url"
 EOF
 echo "Wrote $config_path"
 
-echo "Building raven binary from $REPO_DIR..."
-# -buildvcs=false: this runs under sudo, so the repo (owned by a regular user) looks like
-# "dubious ownership" to git - Go's VCS stamping then fails the build entirely.
-# -o writes straight to BIN_PATH - confirmed safe against a currently-running raven@<slug>
-# (Go builds to a temp file and replaces the destination, not an in-place write): a plain `cp`
-# onto an already-running executable fails with "Text file busy" instead, which is what a manual
-# rebuild-in-place used to hit here.
-( cd "$REPO_DIR" && go build -buildvcs=false -o "$BIN_PATH" . )
-echo "Installed $BIN_PATH"
+# Normally the binary is already installed from a GitHub release (feather's deploy/setup-extras.sh
+# downloads raven + rss-mcp, checksum-verified) and is used as-is. Building from this checkout is
+# the fallback for a box without that, or when RAVEN_REBUILD=1 is set to test local changes.
+if [[ -x "$BIN_PATH" && -z "${RAVEN_REBUILD:-}" ]]; then
+  echo "Using installed $BIN_PATH (set RAVEN_REBUILD=1 to build from $REPO_DIR instead)"
+elif command -v go >/dev/null; then
+  echo "Building raven binary from $REPO_DIR..."
+  # -buildvcs=false: this runs under sudo, so the repo (owned by a regular user) looks like
+  # "dubious ownership" to git - Go's VCS stamping then fails the build entirely.
+  # -o writes straight to BIN_PATH - confirmed safe against a currently-running raven@<slug>
+  # (Go builds to a temp file and replaces the destination, not an in-place write): a plain `cp`
+  # onto an already-running executable fails with "Text file busy" instead, which is what a manual
+  # rebuild-in-place used to hit here.
+  ( cd "$REPO_DIR" && go build -buildvcs=false -o "$BIN_PATH" . )
+  echo "Installed $BIN_PATH"
+else
+  echo "No $BIN_PATH and no Go toolchain - install the release binary first (feather: sudo bash deploy/setup-extras.sh)." >&2
+  exit 1
+fi
 
 if [[ ! -f "$UNIT_PATH" ]]; then
   cp "$REPO_DIR/systemd/raven@.service" "$UNIT_PATH"

@@ -14,6 +14,31 @@ receiving end, not here.
 **Status:** feed fetching, keyword matching, full-article extraction, and posting candidates all
 work end to end (verified against a live feed and a live Feather ingest endpoint).
 
+## rss-mcp
+
+`rss-mcp/` is a second binary in this repo: Feather's RSS *reader* - a stdio MCP server exposing a
+configured feed list (`list_feeds`, `refresh_all_feeds`, `add_feed`, `update_feed`, `remove_feed`,
+`check_feed_health`) plus one-off `fetch_feed_entries` / `fetch_article_content`. A Go port of the
+TypeScript [feather-rss-mcp](https://github.com/SparkMike77/feather-rss-mcp), tool-for-tool
+compatible (same names, parameters, JSON shapes, `FEEDS_CONFIG` / `HEALTH_LOG` env vars and
+`feeds.config.json` format), so it replaces it by changing only the `command` Feather launches.
+
+Feeds are fetched exactly as the Node version did - `User-Agent: rss-parser`,
+`Accept: application/rss+xml`, HTTP/1.1 only - because some publishers filter on it: CBC's CDN
+drops unrecognised user agents, and Hacker News answers non-browser HTTP/2 clients with a 419.
+
+```sh
+go build -o rss-mcp ./rss-mcp
+FEEDS_CONFIG=/var/lib/feather/feeds.config.json ./rss-mcp   # speaks MCP on stdin/stdout
+```
+
+## Releases
+
+Pushing a `v*` tag runs `.github/workflows/release.yml`, which attaches static Linux binaries
+(`raven-linux-{amd64,arm64}`, `rss-mcp-linux-{amd64,arm64}`) and a `SHA256SUMS` file to the
+release. Servers install from those - no Go toolchain needed (see Feather's
+`deploy/setup-extras.sh`).
+
 ## Build
 
 ```sh
